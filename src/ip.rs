@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use core::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use axerrno::AxError;
 use netlink_packet_utils::DecodeError;
 
 pub(crate) const IPV4_ADDR_LEN: usize = 4;
@@ -11,12 +12,7 @@ pub(crate) fn parse_ipv4_addr(raw: &[u8]) -> Result<Ipv4Addr, DecodeError> {
     if raw.len() == IPV4_ADDR_LEN {
         Ok(Ipv4Addr::new(raw[0], raw[1], raw[2], raw[3]))
     } else {
-        Err(DecodeError::from(format!(
-            "Invalid u8 array length {}, expecting \
-            {IPV4_ADDR_LEN} for IPv4 address, got {:?}",
-            raw.len(),
-            raw,
-        )))
+        Err(AxError::InvalidInput)
     }
 }
 
@@ -26,12 +22,7 @@ pub(crate) fn parse_ipv6_addr(raw: &[u8]) -> Result<Ipv6Addr, DecodeError> {
         data.copy_from_slice(raw);
         Ok(Ipv6Addr::from(data))
     } else {
-        Err(DecodeError::from(format!(
-            "Invalid u8 array length {}, expecting {IPV6_ADDR_LEN} \
-            for IPv6 address, got {:?}",
-            raw.len(),
-            raw,
-        )))
+        Err(AxError::InvalidInput)
     }
 }
 
@@ -48,12 +39,7 @@ pub(crate) fn parse_ip_addr(raw: &[u8]) -> Result<IpAddr, DecodeError> {
     } else if raw.len() == IPV4_ADDR_LEN {
         parse_ipv4_addr(raw).map(IpAddr::from)
     } else {
-        Err(DecodeError::from(format!(
-            "Invalid u8 array length {}, expecting {IPV6_ADDR_LEN} \
-            for IPv6 address or {IPV4_ADDR_LEN} for IPv4 address, got {:?}",
-            raw.len(),
-            raw,
-        )))
+        Err(AxError::InvalidInput)
     }
 }
 

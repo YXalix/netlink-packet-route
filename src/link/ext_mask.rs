@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+use alloc::vec::Vec;
+
 const RTEXT_FILTER_VF: u32 = 1 << 0;
 const RTEXT_FILTER_BRVLAN: u32 = 1 << 1;
 const RTEXT_FILTER_BRVLAN_COMPRESSED: u32 = 1 << 2;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::vec::Vec;
+use alloc::vec;
 use netlink_packet_utils::{
     nla::{self, DefaultNla, NlaBuffer, NlasIterator},
     traits::{Emitable, Parseable},
@@ -31,7 +32,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
         let mut nlas = vec![];
         let err = "Invalid AF_INET NLA for IFLA_AF_SPEC(AF_UNSPEC)";
         for nla in NlasIterator::new(buf.into_inner()) {
-            let nla = nla.context(err)?;
+            let nla = nla?;
             nlas.push(AfSpecInet::parse(&nla)?);
         }
         Ok(Self(nlas))
@@ -80,9 +81,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for AfSpecInet {
                     .as_slice(),
                 ))?)
             }
-            kind => Other(DefaultNla::parse(buf).context(format!(
-                "Unknown NLA type {kind} for IFLA_AF_SPEC(inet)"
-            ))?),
+            kind => Other(DefaultNla::parse(buf)?),
         })
     }
 }

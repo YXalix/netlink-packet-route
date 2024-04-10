@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::vec::Vec;
+use alloc::vec;
 use netlink_packet_utils::{
     nla::{NlaBuffer, NlasIterator},
     traits::{Emitable, Parseable},
@@ -93,9 +94,9 @@ impl<'a, T: AsRef<[u8]> + 'a> Parseable<AddressMessageBuffer<&'a T>>
     fn parse(buf: &AddressMessageBuffer<&'a T>) -> Result<Self, DecodeError> {
         Ok(AddressMessage {
             header: AddressHeader::parse(buf)
-                .context("failed to parse address message header")?,
+                ?,
             attributes: Vec::<AddressAttribute>::parse(buf)
-                .context("failed to parse address message NLAs")?,
+                ?,
         })
     }
 }

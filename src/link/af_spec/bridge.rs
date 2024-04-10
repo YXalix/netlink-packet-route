@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::vec::Vec;
+use alloc::vec;
+use axerrno::AxError;
 use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{self, DefaultNla, NlaBuffer},
@@ -59,15 +61,15 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for AfSpecBridge {
         Ok(match buf.kind() {
             IFLA_BRIDGE_VLAN_INFO => VlanInfo(
                 BridgeVlanInfo::try_from(payload)
-                    .context("Invalid IFLA_BRIDGE_VLAN_INFO value")?,
+                    ?,
             ),
             IFLA_BRIDGE_FLAGS => Flags(
                 parse_u16(payload)
-                    .context("invalid IFLA_BRIDGE_FLAGS value")?,
+                    ?,
             ),
             kind => Other(
                 DefaultNla::parse(buf)
-                    .context(format!("Unknown NLA type {kind}"))?,
+                    ?,
             ),
         })
     }
@@ -86,8 +88,8 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
         for nla in
             netlink_packet_utils::nla::NlasIterator::new(buf.into_inner())
         {
-            let nla = nla.context(err)?;
-            nlas.push(AfSpecBridge::parse(&nla).context(err)?);
+            let nla = nla?;
+            nlas.push(AfSpecBridge::parse(&nla)?);
         }
         Ok(Self(nlas))
     }
@@ -114,18 +116,11 @@ impl TryFrom<&[u8]> for BridgeVlanInfo {
     fn try_from(raw: &[u8]) -> Result<Self, DecodeError> {
         if raw.len() == 4 {
             Ok(Self {
-                flags: parse_u16(&raw[0..2]).context(format!(
-                    "Invalid IFLA_BRIDGE_VLAN_INFO value: {raw:?}"
-                ))?,
-                vid: parse_u16(&raw[2..4]).context(format!(
-                    "Invalid IFLA_BRIDGE_VLAN_INFO value: {raw:?}"
-                ))?,
+                flags: parse_u16(&raw[0..2])?,
+                vid: parse_u16(&raw[2..4])?,
             })
         } else {
-            Err(DecodeError::from(format!(
-                "Invalid IFLA_BRIDGE_VLAN_INFO value, expecting [u8;4], \
-                but got {raw:?}"
-            )))
+            Err(AxError::InvalidInput)
         }
     }
 }

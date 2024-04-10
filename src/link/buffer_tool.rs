@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MIT
 
+use alloc::vec::Vec;
+use alloc::vec;
+
 pub(crate) fn expand_buffer_if_small(
     got: &[u8],
     expected_size: usize,

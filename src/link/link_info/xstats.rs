@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use alloc::vec::Vec;
 use netlink_packet_utils::{
     nla::NlaBuffer, DecodeError, Emitable, ParseableParametrized,
 };

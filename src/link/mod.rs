@@ -23,8 +23,6 @@ mod vlan_protocol;
 mod wireless;
 mod xdp;
 
-mod tests;
-
 pub use self::af_spec::{
     AfSpecBridge, AfSpecInet, AfSpecInet6, AfSpecUnspec, BridgeVlanInfo,
     Icmp6Stats, Icmp6StatsBuffer, Inet6CacheInfo, Inet6CacheInfoBuffer,

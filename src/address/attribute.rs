@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-use std::mem::size_of;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use core::mem::size_of;
+use core::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use anyhow::Context;
+use alloc::string::String;
+use axerrno::AxError;
 use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer},
@@ -123,11 +124,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     data.copy_from_slice(&payload[0..IPV6_ADDR_LEN]);
                     Self::Address(IpAddr::from(data))
                 } else {
-                    return Err(DecodeError::from(format!(
-                        "Invalid IFA_LOCAL, got unexpected length \
-                            of payload {:?}",
-                        payload
-                    )));
+                    return Err(AxError::InvalidInput);
                 }
             }
             IFA_LOCAL => {
@@ -140,15 +137,11 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     data.copy_from_slice(&payload[0..IPV6_ADDR_LEN]);
                     Self::Local(IpAddr::from(data))
                 } else {
-                    return Err(DecodeError::from(format!(
-                        "Invalid IFA_LOCAL, got unexpected length \
-                        of payload {:?}",
-                        payload
-                    )));
+                    return Err(AxError::InvalidInput);
                 }
             }
             IFA_LABEL => Self::Label(
-                parse_string(payload).context("invalid IFA_LABEL value")?,
+                parse_string(payload)?,
             ),
             IFA_BROADCAST => {
                 if payload.len() == IPV4_ADDR_LEN {
@@ -156,11 +149,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     data.copy_from_slice(&payload[0..IPV4_ADDR_LEN]);
                     Self::Broadcast(Ipv4Addr::from(data))
                 } else {
-                    return Err(DecodeError::from(format!(
-                        "Invalid IFA_BROADCAST, got unexpected length \
-                        of IPv4 address payload {:?}",
-                        payload
-                    )));
+                    return Err(AxError::InvalidInput);
                 }
             }
             IFA_ANYCAST => {
@@ -169,16 +158,11 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     data.copy_from_slice(&payload[0..IPV6_ADDR_LEN]);
                     Self::Anycast(Ipv6Addr::from(data))
                 } else {
-                    return Err(DecodeError::from(format!(
-                        "Invalid IFA_ANYCAST, got unexpected length \
-                        of IPv6 address payload {:?}",
-                        payload
-                    )));
+                    return Err(AxError::InvalidInput);
                 }
             }
             IFA_CACHEINFO => Self::CacheInfo(
-                CacheInfo::parse(&CacheInfoBuffer::new(payload))
-                    .context(format!("Invalid IFA_CACHEINFO {:?}", payload))?,
+                CacheInfo::parse(&CacheInfoBuffer::new(payload))?,
             ),
             IFA_MULTICAST => {
                 if payload.len() == IPV6_ADDR_LEN {
@@ -186,19 +170,14 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     data.copy_from_slice(&payload[0..IPV6_ADDR_LEN]);
                     Self::Multicast(Ipv6Addr::from(data))
                 } else {
-                    return Err(DecodeError::from(format!(
-                        "Invalid IFA_MULTICAST, got unexpected length \
-                        of IPv6 address payload {:?}",
-                        payload
-                    )));
+                    return Err(AxError::InvalidInput);
                 }
             }
             IFA_FLAGS => Self::Flags(AddressFlags::from_bits_retain(
-                parse_u32(payload).context("invalid IFA_FLAGS value")?,
+                parse_u32(payload)?,
             )),
             kind => Self::Other(
-                DefaultNla::parse(buf)
-                    .context(format!("unknown NLA type {kind}"))?,
+                DefaultNla::parse(buf)?,
             ),
         })
     }

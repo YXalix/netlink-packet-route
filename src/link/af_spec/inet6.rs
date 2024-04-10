@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-use std::net::Ipv6Addr;
+use core::net::Ipv6Addr;
 
-use anyhow::Context;
+use alloc::vec::Vec;
+use alloc::vec;
 use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator},
@@ -57,8 +58,8 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
         let mut nlas = vec![];
         let err = "Invalid AF_INET6 NLA for IFLA_AF_SPEC(AF_UNSPEC)";
         for nla in NlasIterator::new(buf.into_inner()) {
-            let nla = nla.context(err)?;
-            nlas.push(AfSpecInet6::parse(&nla).context(err)?);
+            let nla = nla?;
+            nlas.push(AfSpecInet6::parse(&nla)?);
         }
         Ok(Self(nlas))
     }
@@ -117,14 +118,10 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for AfSpecInet6 {
         let payload = buf.value();
         Ok(match buf.kind() {
             IFLA_INET6_FLAGS => Flags(Inet6IfaceFlags::from_bits_retain(
-                parse_u32(payload).context("invalid IFLA_INET6_FLAGS value")?,
+                parse_u32(payload)?,
             )),
             IFLA_INET6_CACHEINFO => CacheInfo(
-                Inet6CacheInfo::parse(&Inet6CacheInfoBuffer::new(payload))
-                    .context(format!(
-                        "invalid IFLA_INET6_CACHEINFO value {:?}",
-                        payload
-                    ))?,
+                Inet6CacheInfo::parse(&Inet6CacheInfoBuffer::new(payload))?,
             ),
             IFLA_INET6_CONF => DevConf(
                 Inet6DevConf::parse(&Inet6DevConfBuffer::new(
@@ -134,10 +131,6 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for AfSpecInet6 {
                         "IFLA_INET6_CONF",
                     )
                     .as_slice(),
-                ))
-                .context(format!(
-                    "invalid IFLA_INET6_CONF value {:?}",
-                    payload
                 ))?,
             ),
             IFLA_INET6_STATS => Stats(
@@ -148,10 +141,6 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for AfSpecInet6 {
                         "IFLA_INET6_STATS",
                     )
                     .as_slice(),
-                ))
-                .context(format!(
-                    "invalid IFLA_INET6_STATS value {:?}",
-                    payload
                 ))?,
             ),
             IFLA_INET6_ICMP6STATS => Icmp6Stats(
@@ -162,27 +151,21 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for AfSpecInet6 {
                         "IFLA_INET6_ICMP6STATS",
                     )
                     .as_slice(),
-                ))
-                .context(format!(
-                    "invalid IFLA_INET6_ICMP6STATS value {:?}",
-                    payload
                 ))?,
             ),
             IFLA_INET6_TOKEN => Token(
                 parse_ipv6_addr(payload)
-                    .context("invalid IFLA_INET6_TOKEN value")?,
+                    ?,
             ),
             IFLA_INET6_ADDR_GEN_MODE => AddrGenMode(
                 parse_u8(payload)
-                    .context("invalid IFLA_INET6_ADDR_GEN_MODE value")?,
+                    ?,
             ),
             IFLA_INET6_RA_MTU => RaMtu(
                 parse_u32(payload)
-                    .context("invalid IFLA_INET6_RA_MTU value")?,
+                    ?,
             ),
-            kind => Other(DefaultNla::parse(buf).context(format!(
-                "unknown AF_INET6 NLA type {kind} for IFLA_AF_SPEC(AF_UNSPEC)"
-            ))?),
+            kind => Other(DefaultNla::parse(buf)?),
         })
     }
 }

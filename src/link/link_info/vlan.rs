@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::vec::Vec;
+use axerrno::AxError;
 use byteorder::{BigEndian, ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator},
@@ -115,18 +116,16 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
         Ok(match buf.kind() {
             IFLA_VLAN_QOS_MAPPING => {
                 if payload.len() != 8 {
-                    return Err("invalid IFLA_VLAN_QOS_MAPPING value".into());
+                    return Err(AxError::InvalidInput);
                 }
                 Mapping(
                     parse_u32(&payload[..4])
-                        .context("expected u32 from value")?,
+                        ?,
                     parse_u32(&payload[4..])
-                        .context("expected u32 to value")?,
+                        ?,
                 )
             }
-            kind => Other(DefaultNla::parse(buf).context(format!(
-                "unknown NLA type {kind} for VLAN QoS mapping"
-            ))?),
+            kind => Other(DefaultNla::parse(buf)?),
         })
     }
 }
@@ -147,34 +146,31 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for InfoVlan {
         let payload = buf.value();
         Ok(match buf.kind() {
             IFLA_VLAN_ID => {
-                Id(parse_u16(payload).context("invalid IFLA_VLAN_ID value")?)
+                Id(parse_u16(payload)?)
             }
             IFLA_VLAN_FLAGS => {
                 let err = "invalid IFLA_VLAN_FLAGS value";
                 if payload.len() != 8 {
-                    return Err(err.into());
+                    return Err(AxError::InvalidInput);
                 }
-                let flags = parse_u32(&payload[0..4]).context(err)?;
-                let mask = parse_u32(&payload[4..]).context(err)?;
+                let flags = parse_u32(&payload[0..4])?;
+                let mask = parse_u32(&payload[4..])?;
                 Flags((flags, mask))
             }
             IFLA_VLAN_EGRESS_QOS => EgressQos(
                 parse_mappings(payload)
-                    .context("failed to parse IFLA_VLAN_EGRESS_QOS")?,
+                    ?,
             ),
             IFLA_VLAN_INGRESS_QOS => IngressQos(
                 parse_mappings(payload)
-                    .context("failed to parse IFLA_VLAN_INGRESS_QOS")?,
+                    ?,
             ),
             IFLA_VLAN_PROTOCOL => Protocol(
                 parse_u16_be(payload)
-                    .context("invalid IFLA_VLAN_PROTOCOL value")?
+                    ?
                     .into(),
             ),
-            _ => Self::Other(DefaultNla::parse(buf).context(format!(
-                "invalid NLA for {}: {payload:?}",
-                buf.kind()
-            ))?),
+            _ => Self::Other(DefaultNla::parse(buf)?),
         })
     }
 }

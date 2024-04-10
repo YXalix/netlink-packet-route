@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use alloc::vec::Vec;
 use netlink_packet_utils::{DecodeError, Emitable, Parseable};
 
 // Place holder for kernel code is `struct iw_event`

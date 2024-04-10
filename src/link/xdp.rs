@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use std::{mem::size_of, os::fd::RawFd};
+use core::mem::size_of;
 
-use anyhow::Context;
+use alloc::vec::Vec;
 use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator},
@@ -28,7 +28,7 @@ const XDP_ATTACHED_MULTI: u8 = 4;
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum LinkXdp {
-    Fd(RawFd),
+    Fd(i32),
     Attached(XdpAttached),
     Flags(u32),
     ProgId(u32),
@@ -42,7 +42,7 @@ pub enum LinkXdp {
 impl Nla for LinkXdp {
     fn value_len(&self) -> usize {
         match self {
-            Self::Fd(_) => size_of::<RawFd>(),
+            Self::Fd(_) => size_of::<i32>(),
             Self::Attached(_) => size_of::<u8>(),
             Self::Flags(_) => size_of::<u32>(),
             Self::ProgId(_) => size_of::<u32>(),
@@ -96,34 +96,33 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for LinkXdp {
         let payload = nla.value();
         Ok(match nla.kind() as u32 {
             IFLA_XDP_FD => Self::Fd(
-                parse_i32(payload).context("invalid IFLA_XDP_FD value")?,
+                parse_i32(payload)?,
             ),
             IFLA_XDP_ATTACHED => {
                 let err = "invalid IFLA_XDP_ATTACHED value";
-                let value = parse_u8(payload).context(err)?;
-                Self::Attached(XdpAttached::try_from(value).context(err)?)
+                let value = parse_u8(payload)?;
+                Self::Attached(XdpAttached::try_from(value)?)
             }
             IFLA_XDP_FLAGS => Self::Flags(
-                parse_u32(payload).context("invalid IFLA_XDP_FLAGS value")?,
+                parse_u32(payload)?,
             ),
             IFLA_XDP_PROG_ID => Self::ProgId(
-                parse_u32(payload).context("invalid IFLA_XDP_PROG_ID value")?,
+                parse_u32(payload)?,
             ),
             IFLA_XDP_DRV_PROG_ID => Self::DrvProgId(
-                parse_u32(payload).context("invalid IFLA_XDP_PROG_ID value")?,
+                parse_u32(payload)?,
             ),
             IFLA_XDP_SKB_PROG_ID => Self::SkbProgId(
-                parse_u32(payload).context("invalid IFLA_XDP_PROG_ID value")?,
+                parse_u32(payload)?,
             ),
             IFLA_XDP_HW_PROG_ID => Self::HwProgId(
-                parse_u32(payload).context("invalid IFLA_XDP_PROG_ID value")?,
+                parse_u32(payload)?,
             ),
             IFLA_XDP_EXPECTED_FD => Self::ExpectedFd(
-                parse_u32(payload).context("invalid IFLA_XDP_PROG_ID value")?,
+                parse_u32(payload)?,
             ),
             _ => Self::Other(
-                DefaultNla::parse(nla)
-                    .context(format!("unknown NLA type {}", nla.kind()))?,
+                DefaultNla::parse(nla)?,
             ),
         })
     }

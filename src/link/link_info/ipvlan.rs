@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
 use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer},
@@ -55,16 +54,14 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for InfoIpVlan {
         Ok(match buf.kind() {
             IFLA_IPVLAN_MODE => Mode(
                 parse_u16(payload)
-                    .context("invalid IFLA_IPVLAN_MODE value")?
+                    ?
                     .into(),
             ),
             IFLA_IPVLAN_FLAGS => Flags(
                 parse_u16(payload)
-                    .context("invalid IFLA_IPVLAN_FLAGS value")?,
+                    ?,
             ),
-            kind => Other(DefaultNla::parse(buf).context(format!(
-                "unknown NLA type {kind} for IFLA_INFO_DATA(ipvlan)"
-            ))?),
+            kind => Other(DefaultNla::parse(buf)?),
         })
     }
 }
@@ -112,16 +109,14 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for InfoIpVtap {
         Ok(match buf.kind() {
             IFLA_IPVLAN_MODE => Mode(
                 parse_u16(payload)
-                    .context("invalid IFLA_IPVLAN_MODE value")?
+                    ?
                     .into(),
             ),
             IFLA_IPVLAN_FLAGS => Flags(
                 parse_u16(payload)
-                    .context("invalid IFLA_IPVLAN_FLAGS value")?,
+                    ?,
             ),
-            kind => Other(DefaultNla::parse(buf).context(format!(
-                "unknown NLA type {kind} for IFLA_INFO_DATA(ipvlan)"
-            ))?),
+            kind => Other(DefaultNla::parse(buf)?),
         })
     }
 }

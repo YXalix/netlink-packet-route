@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::vec::Vec;
+use alloc::vec;
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator},
     traits::{Emitable, Parseable},
@@ -52,27 +53,23 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
         let mut nlas = vec![];
         let err = "Invalid NLA for IFLA_AF_SPEC(AF_UNSPEC)";
         for nla in NlasIterator::new(buf.into_inner()) {
-            let nla = nla.context(err)?;
+            let nla = nla?;
             nlas.push(match nla.kind() {
                 k if k == u8::from(AddressFamily::Inet) as u16 => {
                     AfSpecUnspec::Inet(
                         VecAfSpecInet::parse(&NlaBuffer::new(&nla.value()))
-                            .context(err)?
+                            ?
                             .0,
                     )
                 }
                 k if k == u8::from(AddressFamily::Inet6) as u16 => {
                     AfSpecUnspec::Inet6(
                         VecAfSpecInet6::parse(&NlaBuffer::new(&nla.value()))
-                            .context(err)?
+                            ?
                             .0,
                     )
                 }
-                kind => AfSpecUnspec::Other(DefaultNla::parse(&nla).context(
-                    format!(
-                        "Unknown AF_XXX type {kind} for IFLA_AF_SPEC(AF_UNSPEC)"
-                    ),
-                )?),
+                kind => AfSpecUnspec::Other(DefaultNla::parse(&nla)?),
             })
         }
         Ok(Self(nlas))

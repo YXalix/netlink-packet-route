@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use std::fmt;
+use core::fmt;
 
 const IFF_UP: u32 = 1 << 0;
 const IFF_BROADCAST: u32 = 1 << 1;

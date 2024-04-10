@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::vec;
+use axerrno::AxError;
 use netlink_packet_utils::{
     DecodeError, Emitable, Parseable, ParseableParametrized,
 };
@@ -12,13 +13,6 @@ use netlink_packet_core::{
 use crate::{
     address::{AddressHeader, AddressMessage, AddressMessageBuffer},
     link::{LinkMessage, LinkMessageBuffer},
-    neighbour::{NeighbourMessage, NeighbourMessageBuffer},
-    neighbour_table::{NeighbourTableMessage, NeighbourTableMessageBuffer},
-    nsid::{NsidMessage, NsidMessageBuffer},
-    prefix::{PrefixMessage, PrefixMessageBuffer},
-    route::{RouteHeader, RouteMessage, RouteMessageBuffer},
-    rule::{RuleMessage, RuleMessageBuffer},
-    tc::{TcMessage, TcMessageBuffer},
 };
 
 const RTM_NEWLINK: u16 = 16;
@@ -94,7 +88,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized>
             RTM_NEWLINK | RTM_GETLINK | RTM_DELLINK | RTM_SETLINK => {
                 let msg = match LinkMessageBuffer::new_checked(&buf.inner()) {
                     Ok(buf) => LinkMessage::parse(&buf)
-                        .context("invalid link message")?,
+                        ?,
                     // HACK: iproute2 sends invalid RTM_GETLINK message, where
                     // the header is limited to the
                     // interface family (1 byte) and 3 bytes of padding.
@@ -123,7 +117,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized>
                 let msg = match AddressMessageBuffer::new_checked(&buf.inner())
                 {
                     Ok(buf) => AddressMessage::parse(&buf)
-                        .context("invalid link message")?,
+                        ?,
                     // HACK: iproute2 sends invalid RTM_GETADDR message, where
                     // the header is limited to the
                     // interface family (1 byte) and 3 bytes of padding.
@@ -148,168 +142,9 @@ impl<'a, T: AsRef<[u8]> + ?Sized>
                     _ => unreachable!(),
                 }
             }
-
-            // Neighbour messages
-            RTM_NEWNEIGH | RTM_GETNEIGH | RTM_DELNEIGH => {
-                let err = "invalid neighbour message";
-                let msg = NeighbourMessage::parse(
-                    &NeighbourMessageBuffer::new_checked(&buf.inner())
-                        .context(err)?,
-                )
-                .context(err)?;
-                match message_type {
-                    RTM_GETNEIGH => RouteNetlinkMessage::GetNeighbour(msg),
-                    RTM_NEWNEIGH => RouteNetlinkMessage::NewNeighbour(msg),
-                    RTM_DELNEIGH => RouteNetlinkMessage::DelNeighbour(msg),
-                    _ => unreachable!(),
-                }
-            }
-
-            // Neighbour table messages
-            RTM_NEWNEIGHTBL | RTM_GETNEIGHTBL | RTM_SETNEIGHTBL => {
-                let err = "invalid neighbour table message";
-                let msg = NeighbourTableMessage::parse(
-                    &NeighbourTableMessageBuffer::new_checked(&buf.inner())
-                        .context(err)?,
-                )
-                .context(err)?;
-                match message_type {
-                    RTM_GETNEIGHTBL => {
-                        RouteNetlinkMessage::GetNeighbourTable(msg)
-                    }
-                    RTM_NEWNEIGHTBL => {
-                        RouteNetlinkMessage::NewNeighbourTable(msg)
-                    }
-                    RTM_SETNEIGHTBL => {
-                        RouteNetlinkMessage::SetNeighbourTable(msg)
-                    }
-                    _ => unreachable!(),
-                }
-            }
-
-            // Route messages
-            RTM_NEWROUTE | RTM_GETROUTE | RTM_DELROUTE => {
-                let msg = match RouteMessageBuffer::new_checked(&buf.inner()) {
-                    Ok(buf) => RouteMessage::parse(&buf)
-                        .context("invalid route message")?,
-                    // HACK: iproute2 sends invalid RTM_GETROUTE message, where
-                    // the header is limited to the
-                    // interface family (1 byte) and 3 bytes of padding.
-                    Err(e) => {
-                        // Not only does iproute2 sends invalid messages, it's
-                        // also inconsistent in
-                        // doing so: for link and address messages, the length
-                        // advertised in the
-                        // netlink header includes the 3 bytes of padding but it
-                        // does not seem to be the case
-                        // for the route message, hence the buf.length() == 1
-                        // check.
-                        if (buf.inner().len() == 4 || buf.inner().len() == 1)
-                            && message_type == RTM_GETROUTE
-                        {
-                            let mut msg = RouteMessage {
-                                header: RouteHeader::default(),
-                                attributes: vec![],
-                            };
-                            msg.header.address_family = buf.inner()[0].into();
-                            msg
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                };
-                match message_type {
-                    RTM_NEWROUTE => RouteNetlinkMessage::NewRoute(msg),
-                    RTM_GETROUTE => RouteNetlinkMessage::GetRoute(msg),
-                    RTM_DELROUTE => RouteNetlinkMessage::DelRoute(msg),
-                    _ => unreachable!(),
-                }
-            }
-
-            // Prefix messages
-            RTM_NEWPREFIX => {
-                let err = "invalid prefix message";
-                RouteNetlinkMessage::NewPrefix(
-                    PrefixMessage::parse(
-                        &PrefixMessageBuffer::new_checked(&buf.inner())
-                            .context(err)?,
-                    )
-                    .context(err)?,
-                )
-            }
-
-            RTM_NEWRULE | RTM_GETRULE | RTM_DELRULE => {
-                let err = "invalid fib rule message";
-                let msg = RuleMessage::parse(
-                    &RuleMessageBuffer::new_checked(&buf.inner())
-                        .context(err)?,
-                )
-                .context(err)?;
-                match message_type {
-                    RTM_NEWRULE => RouteNetlinkMessage::NewRule(msg),
-                    RTM_DELRULE => RouteNetlinkMessage::DelRule(msg),
-                    RTM_GETRULE => RouteNetlinkMessage::GetRule(msg),
-                    _ => unreachable!(),
-                }
-            }
-            // TC Messages
-            RTM_NEWQDISC | RTM_DELQDISC | RTM_GETQDISC | RTM_NEWTCLASS
-            | RTM_DELTCLASS | RTM_GETTCLASS | RTM_NEWTFILTER
-            | RTM_DELTFILTER | RTM_GETTFILTER | RTM_NEWCHAIN | RTM_DELCHAIN
-            | RTM_GETCHAIN => {
-                let err = "invalid tc message";
-                let msg = TcMessage::parse(
-                    &TcMessageBuffer::new_checked(&buf.inner()).context(err)?,
-                )
-                .context(err)?;
-                match message_type {
-                    RTM_NEWQDISC => {
-                        RouteNetlinkMessage::NewQueueDiscipline(msg)
-                    }
-                    RTM_DELQDISC => {
-                        RouteNetlinkMessage::DelQueueDiscipline(msg)
-                    }
-                    RTM_GETQDISC => {
-                        RouteNetlinkMessage::GetQueueDiscipline(msg)
-                    }
-                    RTM_NEWTCLASS => RouteNetlinkMessage::NewTrafficClass(msg),
-                    RTM_DELTCLASS => RouteNetlinkMessage::DelTrafficClass(msg),
-                    RTM_GETTCLASS => RouteNetlinkMessage::GetTrafficClass(msg),
-                    RTM_NEWTFILTER => {
-                        RouteNetlinkMessage::NewTrafficFilter(msg)
-                    }
-                    RTM_DELTFILTER => {
-                        RouteNetlinkMessage::DelTrafficFilter(msg)
-                    }
-                    RTM_GETTFILTER => {
-                        RouteNetlinkMessage::GetTrafficFilter(msg)
-                    }
-                    RTM_NEWCHAIN => RouteNetlinkMessage::NewTrafficChain(msg),
-                    RTM_DELCHAIN => RouteNetlinkMessage::DelTrafficChain(msg),
-                    RTM_GETCHAIN => RouteNetlinkMessage::GetTrafficChain(msg),
-                    _ => unreachable!(),
-                }
-            }
-
-            // ND ID Messages
-            RTM_NEWNSID | RTM_GETNSID | RTM_DELNSID => {
-                let err = "invalid nsid message";
-                let msg = NsidMessage::parse(
-                    &NsidMessageBuffer::new_checked(&buf.inner())
-                        .context(err)?,
-                )
-                .context(err)?;
-                match message_type {
-                    RTM_NEWNSID => RouteNetlinkMessage::NewNsId(msg),
-                    RTM_DELNSID => RouteNetlinkMessage::DelNsId(msg),
-                    RTM_GETNSID => RouteNetlinkMessage::GetNsId(msg),
-                    _ => unreachable!(),
-                }
-            }
-
             _ => {
                 return Err(
-                    format!("Unknown message type: {message_type}").into()
+                    AxError::InvalidInput
                 )
             }
         };
@@ -329,34 +164,6 @@ pub enum RouteNetlinkMessage {
     NewAddress(AddressMessage),
     DelAddress(AddressMessage),
     GetAddress(AddressMessage),
-    NewNeighbour(NeighbourMessage),
-    GetNeighbour(NeighbourMessage),
-    DelNeighbour(NeighbourMessage),
-    NewNeighbourTable(NeighbourTableMessage),
-    GetNeighbourTable(NeighbourTableMessage),
-    SetNeighbourTable(NeighbourTableMessage),
-    NewRoute(RouteMessage),
-    DelRoute(RouteMessage),
-    GetRoute(RouteMessage),
-    NewPrefix(PrefixMessage),
-    NewQueueDiscipline(TcMessage),
-    DelQueueDiscipline(TcMessage),
-    GetQueueDiscipline(TcMessage),
-    NewTrafficClass(TcMessage),
-    DelTrafficClass(TcMessage),
-    GetTrafficClass(TcMessage),
-    NewTrafficFilter(TcMessage),
-    DelTrafficFilter(TcMessage),
-    GetTrafficFilter(TcMessage),
-    NewTrafficChain(TcMessage),
-    DelTrafficChain(TcMessage),
-    GetTrafficChain(TcMessage),
-    NewNsId(NsidMessage),
-    DelNsId(NsidMessage),
-    GetNsId(NsidMessage),
-    NewRule(RuleMessage),
-    DelRule(RuleMessage),
-    GetRule(RuleMessage),
 }
 
 impl RouteNetlinkMessage {
@@ -388,114 +195,6 @@ impl RouteNetlinkMessage {
         matches!(self, RouteNetlinkMessage::GetAddress(_))
     }
 
-    pub fn is_get_neighbour(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetNeighbour(_))
-    }
-
-    pub fn is_new_route(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewRoute(_))
-    }
-
-    pub fn is_new_neighbour(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewNeighbour(_))
-    }
-
-    pub fn is_get_route(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetRoute(_))
-    }
-
-    pub fn is_del_neighbour(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::DelNeighbour(_))
-    }
-
-    pub fn is_new_neighbour_table(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewNeighbourTable(_))
-    }
-
-    pub fn is_get_neighbour_table(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetNeighbourTable(_))
-    }
-
-    pub fn is_set_neighbour_table(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::SetNeighbourTable(_))
-    }
-
-    pub fn is_del_route(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::DelRoute(_))
-    }
-
-    pub fn is_new_qdisc(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewQueueDiscipline(_))
-    }
-
-    pub fn is_del_qdisc(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::DelQueueDiscipline(_))
-    }
-
-    pub fn is_get_qdisc(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetQueueDiscipline(_))
-    }
-
-    pub fn is_new_class(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewTrafficClass(_))
-    }
-
-    pub fn is_del_class(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::DelTrafficClass(_))
-    }
-
-    pub fn is_get_class(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetTrafficClass(_))
-    }
-
-    pub fn is_new_filter(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewTrafficFilter(_))
-    }
-
-    pub fn is_del_filter(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::DelTrafficFilter(_))
-    }
-
-    pub fn is_get_filter(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetTrafficFilter(_))
-    }
-
-    pub fn is_new_chain(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewTrafficChain(_))
-    }
-
-    pub fn is_del_chain(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::DelTrafficChain(_))
-    }
-
-    pub fn is_get_chain(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetTrafficChain(_))
-    }
-
-    pub fn is_new_nsid(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewNsId(_))
-    }
-
-    pub fn is_get_nsid(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetNsId(_))
-    }
-
-    pub fn is_del_nsid(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::DelNsId(_))
-    }
-
-    pub fn is_get_rule(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::GetRule(_))
-    }
-
-    pub fn is_new_rule(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::NewRule(_))
-    }
-
-    pub fn is_del_rule(&self) -> bool {
-        matches!(self, RouteNetlinkMessage::DelRule(_))
-    }
-
     pub fn message_type(&self) -> u16 {
         use self::RouteNetlinkMessage::*;
 
@@ -509,34 +208,6 @@ impl RouteNetlinkMessage {
             NewAddress(_) => RTM_NEWADDR,
             DelAddress(_) => RTM_DELADDR,
             GetAddress(_) => RTM_GETADDR,
-            GetNeighbour(_) => RTM_GETNEIGH,
-            NewNeighbour(_) => RTM_NEWNEIGH,
-            DelNeighbour(_) => RTM_DELNEIGH,
-            GetNeighbourTable(_) => RTM_GETNEIGHTBL,
-            NewNeighbourTable(_) => RTM_NEWNEIGHTBL,
-            SetNeighbourTable(_) => RTM_SETNEIGHTBL,
-            NewRoute(_) => RTM_NEWROUTE,
-            DelRoute(_) => RTM_DELROUTE,
-            GetRoute(_) => RTM_GETROUTE,
-            NewPrefix(_) => RTM_NEWPREFIX,
-            NewQueueDiscipline(_) => RTM_NEWQDISC,
-            DelQueueDiscipline(_) => RTM_DELQDISC,
-            GetQueueDiscipline(_) => RTM_GETQDISC,
-            NewTrafficClass(_) => RTM_NEWTCLASS,
-            DelTrafficClass(_) => RTM_DELTCLASS,
-            GetTrafficClass(_) => RTM_GETTCLASS,
-            NewTrafficFilter(_) => RTM_NEWTFILTER,
-            DelTrafficFilter(_) => RTM_DELTFILTER,
-            GetTrafficFilter(_) => RTM_GETTFILTER,
-            NewTrafficChain(_) => RTM_NEWCHAIN,
-            DelTrafficChain(_) => RTM_DELCHAIN,
-            GetTrafficChain(_) => RTM_GETCHAIN,
-            GetNsId(_) => RTM_GETNSID,
-            NewNsId(_) => RTM_NEWNSID,
-            DelNsId(_) => RTM_DELNSID,
-            GetRule(_) => RTM_GETRULE,
-            NewRule(_) => RTM_NEWRULE,
-            DelRule(_) => RTM_DELRULE,
         }
     }
 }
@@ -558,47 +229,6 @@ impl Emitable for RouteNetlinkMessage {
             | DelAddress(ref msg)
             | GetAddress(ref msg)
             => msg.buffer_len(),
-
-            | NewNeighbour(ref msg)
-            | GetNeighbour(ref msg)
-            | DelNeighbour(ref msg)
-            => msg.buffer_len(),
-
-            | NewNeighbourTable(ref msg)
-            | GetNeighbourTable(ref msg)
-            | SetNeighbourTable(ref msg)
-            => msg.buffer_len(),
-
-            | NewRoute(ref msg)
-            | DelRoute(ref msg)
-            | GetRoute(ref msg)
-            => msg.buffer_len(),
-
-            NewPrefix(ref msg) => msg.buffer_len(),
-
-            | NewQueueDiscipline(ref msg)
-            | DelQueueDiscipline(ref msg)
-            | GetQueueDiscipline(ref msg)
-            | NewTrafficClass(ref msg)
-            | DelTrafficClass(ref msg)
-            | GetTrafficClass(ref msg)
-            | NewTrafficFilter(ref msg)
-            | DelTrafficFilter(ref msg)
-            | GetTrafficFilter(ref msg)
-            | NewTrafficChain(ref msg)
-            | DelTrafficChain(ref msg)
-            | GetTrafficChain(ref msg)
-            => msg.buffer_len(),
-
-            | NewNsId(ref msg)
-            | DelNsId(ref msg)
-            | GetNsId(ref msg)
-            => msg.buffer_len(),
-
-            | NewRule(ref msg)
-            | DelRule(ref msg)
-            | GetRule(ref msg)
-            => msg.buffer_len()
         }
     }
 
@@ -618,47 +248,6 @@ impl Emitable for RouteNetlinkMessage {
             | DelAddress(ref msg)
             | GetAddress(ref msg)
             => msg.emit(buffer),
-
-            | GetNeighbour(ref msg)
-            | NewNeighbour(ref msg)
-            | DelNeighbour(ref msg)
-            => msg.emit(buffer),
-
-            | GetNeighbourTable(ref msg)
-            | NewNeighbourTable(ref msg)
-            | SetNeighbourTable(ref msg)
-            => msg.emit(buffer),
-
-            | NewRoute(ref msg)
-            | DelRoute(ref msg)
-            | GetRoute(ref msg)
-            => msg.emit(buffer),
-
-            | NewPrefix(ref msg) => msg.emit(buffer),
-
-            | NewQueueDiscipline(ref msg)
-            | DelQueueDiscipline(ref msg)
-            | GetQueueDiscipline(ref msg)
-            | NewTrafficClass(ref msg)
-            | DelTrafficClass(ref msg)
-            | GetTrafficClass(ref msg)
-            | NewTrafficFilter(ref msg)
-            | DelTrafficFilter(ref msg)
-            | GetTrafficFilter(ref msg)
-            | NewTrafficChain(ref msg)
-            | DelTrafficChain(ref msg)
-            | GetTrafficChain(ref msg)
-            => msg.emit(buffer),
-
-            | NewNsId(ref msg)
-            | DelNsId(ref msg)
-            | GetNsId(ref msg)
-            => msg.emit(buffer),
-
-            | NewRule(ref msg)
-            | DelRule(ref msg)
-            | GetRule(ref msg)
-            => msg.emit(buffer)
         }
     }
 }
@@ -678,11 +267,10 @@ impl NetlinkSerializable for RouteNetlinkMessage {
 }
 
 impl NetlinkDeserializable for RouteNetlinkMessage {
-    type Error = DecodeError;
     fn deserialize(
         header: &NetlinkHeader,
         payload: &[u8],
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, AxError> {
         let buf = RouteNetlinkMessageBuffer::new(payload);
         match RouteNetlinkMessage::parse_with_param(&buf, header.message_type) {
             Err(e) => Err(e),

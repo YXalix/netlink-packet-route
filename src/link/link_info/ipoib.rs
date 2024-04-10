@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
 use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer},
@@ -58,18 +57,16 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for InfoIpoib {
         let payload = buf.value();
         Ok(match buf.kind() {
             IFLA_IPOIB_PKEY => Pkey(
-                parse_u16(payload).context("invalid IFLA_IPOIB_PKEY value")?,
+                parse_u16(payload)?,
             ),
             IFLA_IPOIB_MODE => Mode(
-                parse_u16(payload).context("invalid IFLA_IPOIB_MODE value")?,
+                parse_u16(payload)?,
             ),
             IFLA_IPOIB_UMCAST => UmCast(
                 parse_u16(payload)
-                    .context("invalid IFLA_IPOIB_UMCAST value")?,
+                    ?,
             ),
-            kind => Other(DefaultNla::parse(buf).context(format!(
-                "unknown NLA type {kind} for IFLA_INFO_DATA(ipoib)"
-            ))?),
+            kind => Other(DefaultNla::parse(buf)?),
         })
     }
 }

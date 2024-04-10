@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::vec::Vec;
+use alloc::vec;
 use netlink_packet_utils::{
     traits::{Emitable, Parseable, ParseableParametrized},
     DecodeError,
@@ -34,11 +35,11 @@ impl<'a, T: AsRef<[u8]> + 'a> Parseable<LinkMessageBuffer<&'a T>>
 {
     fn parse(buf: &LinkMessageBuffer<&'a T>) -> Result<Self, DecodeError> {
         let header = LinkHeader::parse(buf)
-            .context("failed to parse link message header")?;
+            ?;
         let interface_family = header.interface_family;
         let attributes =
             Vec::<LinkAttribute>::parse_with_param(buf, interface_family)
-                .context("failed to parse link message NLAs")?;
+                ?;
         Ok(LinkMessage { header, attributes })
     }
 }

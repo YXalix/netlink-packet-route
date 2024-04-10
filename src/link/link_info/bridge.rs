@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use core::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use anyhow::Context;
+use alloc::vec::Vec;
+use axerrno::AxError;
 use byteorder::{BigEndian, ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
@@ -311,207 +312,193 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for InfoBridge {
             IFLA_BR_FDB_FLUSH => Self::FdbFlush,
             IFLA_BR_HELLO_TIMER => Self::HelloTimer(
                 parse_u64(payload)
-                    .context("invalid IFLA_BR_HELLO_TIMER value")?,
+                    ?,
             ),
             IFLA_BR_TCN_TIMER => Self::TcnTimer(
                 parse_u64(payload)
-                    .context("invalid IFLA_BR_TCN_TIMER value")?,
+                    ?,
             ),
             IFLA_BR_TOPOLOGY_CHANGE_TIMER => Self::TopologyChangeTimer(
                 parse_u64(payload)
-                    .context("invalid IFLA_BR_TOPOLOGY_CHANGE_TIMER value")?,
+                    ?,
             ),
             IFLA_BR_GC_TIMER => Self::GcTimer(
-                parse_u64(payload).context("invalid IFLA_BR_GC_TIMER value")?,
+                parse_u64(payload)?,
             ),
             IFLA_BR_MCAST_LAST_MEMBER_INTVL => {
                 Self::MulticastLastMemberInterval(
-                    parse_u64(payload).context(
-                        "invalid IFLA_BR_MCAST_LAST_MEMBER_INTVL value",
-                    )?,
+                    parse_u64(payload)?,
                 )
             }
             IFLA_BR_MCAST_MEMBERSHIP_INTVL => {
                 Self::MulticastMembershipInterval(
-                    parse_u64(payload).context(
-                        "invalid IFLA_BR_MCAST_MEMBERSHIP_INTVL value",
-                    )?,
+                    parse_u64(payload)?,
                 )
             }
             IFLA_BR_MCAST_QUERIER_INTVL => Self::MulticastQuerierInterval(
                 parse_u64(payload)
-                    .context("invalid IFLA_BR_MCAST_QUERIER_INTVL value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_QUERY_INTVL => Self::MulticastQueryInterval(
                 parse_u64(payload)
-                    .context("invalid IFLA_BR_MCAST_QUERY_INTVL value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_QUERY_RESPONSE_INTVL => {
                 Self::MulticastQueryResponseInterval(
-                    parse_u64(payload).context(
-                        "invalid IFLA_BR_MCAST_QUERY_RESPONSE_INTVL value",
-                    )?,
+                    parse_u64(payload)?,
                 )
             }
             IFLA_BR_MCAST_STARTUP_QUERY_INTVL => {
                 Self::MulticastStartupQueryInterval(
-                    parse_u64(payload).context(
-                        "invalid IFLA_BR_MCAST_STARTUP_QUERY_INTVL value",
-                    )?,
+                    parse_u64(payload)?,
                 )
             }
             IFLA_BR_FORWARD_DELAY => Self::ForwardDelay(
                 parse_u32(payload)
-                    .context("invalid IFLA_BR_FORWARD_DELAY value")?,
+                    ?,
             ),
             IFLA_BR_HELLO_TIME => Self::HelloTime(
                 parse_u32(payload)
-                    .context("invalid IFLA_BR_HELLO_TIME value")?,
+                    ?,
             ),
             IFLA_BR_MAX_AGE => Self::MaxAge(
-                parse_u32(payload).context("invalid IFLA_BR_MAX_AGE value")?,
+                parse_u32(payload)?,
             ),
             IFLA_BR_AGEING_TIME => Self::AgeingTime(
                 parse_u32(payload)
-                    .context("invalid IFLA_BR_AGEING_TIME value")?,
+                    ?,
             ),
             IFLA_BR_STP_STATE => Self::StpState(
                 parse_u32(payload)
-                    .context("invalid IFLA_BR_STP_STATE value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_HASH_ELASTICITY => Self::MulticastHashElasticity(
                 parse_u32(payload)
-                    .context("invalid IFLA_BR_MCAST_HASH_ELASTICITY value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_HASH_MAX => Self::MulticastHashMax(
                 parse_u32(payload)
-                    .context("invalid IFLA_BR_MCAST_HASH_MAX value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_LAST_MEMBER_CNT => Self::MulticastLastMemberCount(
                 parse_u32(payload)
-                    .context("invalid IFLA_BR_MCAST_LAST_MEMBER_CNT value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_STARTUP_QUERY_CNT => {
                 Self::MulticastStartupQueryCount(
-                    parse_u32(payload).context(
-                        "invalid IFLA_BR_MCAST_STARTUP_QUERY_CNT value",
-                    )?,
+                    parse_u32(payload)?,
                 )
             }
             IFLA_BR_ROOT_PATH_COST => Self::RootPathCost(
                 parse_u32(payload)
-                    .context("invalid IFLA_BR_ROOT_PATH_COST value")?,
+                    ?,
             ),
             IFLA_BR_PRIORITY => Self::Priority(
-                parse_u16(payload).context("invalid IFLA_BR_PRIORITY value")?,
+                parse_u16(payload)?,
             ),
             IFLA_BR_VLAN_PROTOCOL => Self::VlanProtocol(
                 parse_u16_be(payload)
-                    .context("invalid IFLA_BR_VLAN_PROTOCOL value")?,
+                    ?,
             ),
             IFLA_BR_GROUP_FWD_MASK => Self::GroupFwdMask(
                 parse_u16(payload)
-                    .context("invalid IFLA_BR_GROUP_FWD_MASK value")?,
+                    ?,
             ),
             IFLA_BR_ROOT_ID => Self::RootId(
                 BridgeId::parse(&BridgeIdBuffer::new(payload))
-                    .context("invalid IFLA_BR_ROOT_ID value")?,
+                    ?,
             ),
             IFLA_BR_BRIDGE_ID => Self::BridgeId(
                 BridgeId::parse(&BridgeIdBuffer::new(payload))
-                    .context("invalid IFLA_BR_BRIDGE_ID value")?,
+                    ?,
             ),
             IFLA_BR_GROUP_ADDR => Self::GroupAddr(
                 parse_mac(payload)
-                    .context("invalid IFLA_BR_GROUP_ADDR value")?,
+                    ?,
             ),
             IFLA_BR_ROOT_PORT => Self::RootPort(
                 parse_u16(payload)
-                    .context("invalid IFLA_BR_ROOT_PORT value")?,
+                    ?,
             ),
             IFLA_BR_VLAN_DEFAULT_PVID => Self::VlanDefaultPvid(
                 parse_u16(payload)
-                    .context("invalid IFLA_BR_VLAN_DEFAULT_PVID value")?,
+                    ?,
             ),
             IFLA_BR_VLAN_FILTERING => Self::VlanFiltering(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_VLAN_FILTERING value")?
+                    ?
                     > 0,
             ),
             IFLA_BR_TOPOLOGY_CHANGE => Self::TopologyChange(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_TOPOLOGY_CHANGE value")?,
+                    ?,
             ),
             IFLA_BR_TOPOLOGY_CHANGE_DETECTED => {
-                Self::TopologyChangeDetected(parse_u8(payload).context(
-                    "invalid IFLA_BR_TOPOLOGY_CHANGE_DETECTED value",
-                )?)
+                Self::TopologyChangeDetected(parse_u8(payload)?)
             }
             IFLA_BR_MCAST_ROUTER => Self::MulticastRouter(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_MCAST_ROUTER value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_SNOOPING => Self::MulticastSnooping(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_MCAST_SNOOPING value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_QUERY_USE_IFADDR => Self::MulticastQueryUseIfaddr(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_MCAST_QUERY_USE_IFADDR value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_QUERIER => Self::MulticastQuerier(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_MCAST_QUERIER value")?,
+                    ?,
             ),
             IFLA_BR_NF_CALL_IPTABLES => Self::NfCallIpTables(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_NF_CALL_IPTABLES value")?,
+                    ?,
             ),
             IFLA_BR_NF_CALL_IP6TABLES => Self::NfCallIp6Tables(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_NF_CALL_IP6TABLES value")?,
+                    ?,
             ),
             IFLA_BR_NF_CALL_ARPTABLES => Self::NfCallArpTables(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_NF_CALL_ARPTABLES value")?,
+                    ?,
             ),
             IFLA_BR_VLAN_STATS_ENABLED => Self::VlanStatsEnabled(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_VLAN_STATS_ENABLED value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_STATS_ENABLED => Self::MulticastStatsEnabled(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_MCAST_STATS_ENABLED value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_IGMP_VERSION => Self::MulticastIgmpVersion(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_MCAST_IGMP_VERSION value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_MLD_VERSION => Self::MulticastMldVersion(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_MCAST_MLD_VERSION value")?,
+                    ?,
             ),
             IFLA_BR_VLAN_STATS_PER_PORT => Self::VlanStatsPerHost(
                 parse_u8(payload)
-                    .context("invalid IFLA_BR_VLAN_STATS_PER_PORT value")?,
+                    ?,
             ),
             IFLA_BR_MULTI_BOOLOPT => Self::MultiBoolOpt(
                 parse_u64(payload)
-                    .context("invalid IFLA_BR_MULTI_BOOLOPT value")?,
+                    ?,
             ),
             IFLA_BR_MCAST_QUERIER_STATE => {
                 let mut v = Vec::new();
                 let err = "failed to parse IFLA_BR_MCAST_QUERIER_STATE";
                 for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(err)?;
-                    let parsed = BridgeQuerierState::parse(nla).context(err)?;
+                    let nla = &nla?;
+                    let parsed = BridgeQuerierState::parse(nla)?;
                     v.push(parsed);
                 }
                 Self::MulticastQuerierState(v)
             }
-            _ => Self::Other(DefaultNla::parse(buf).context(
-                "invalid link info bridge NLA value (unknown type)",
-            )?),
+            _ => Self::Other(DefaultNla::parse(buf)?),
         })
     }
 }
@@ -537,7 +524,7 @@ impl<T: AsRef<[u8]> + ?Sized> Parseable<BridgeIdBuffer<&T>> for BridgeId {
         Ok(Self {
             priority: u16::from_be(buf.priority()),
             address: parse_mac(buf.address())
-                .context("invalid MAC address in BridgeId buffer")?,
+                ?,
         })
     }
 }
@@ -623,51 +610,40 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
             BRIDGE_QUERIER_IP_ADDRESS => match parse_ip(payload) {
                 Ok(IpAddr::V4(addr)) => Ipv4Address(addr),
                 Ok(v) => {
-                    return Err(DecodeError::from(format!(
-                        "Invalid BRIDGE_QUERIER_IP_ADDRESS, \
-                        expecting IPv4 address, but got {v}"
-                    )))
+                    return Err(AxError::InvalidInput)
                 }
                 Err(e) => {
-                    return Err(DecodeError::from(format!(
-                        "Invalid BRIDGE_QUERIER_IP_ADDRESS {e}"
-                    )))
+                    return Err(AxError::InvalidInput)
                 }
             },
             BRIDGE_QUERIER_IPV6_ADDRESS => match parse_ip(payload) {
                 Ok(IpAddr::V6(addr)) => Ipv6Address(addr),
                 Ok(v) => {
-                    return Err(DecodeError::from(format!(
-                        "Invalid BRIDGE_QUERIER_IPV6_ADDRESS, \
-                        expecting IPv6 address, but got {v}"
-                    )));
+                    return Err(AxError::InvalidInput);
                 }
                 Err(e) => {
-                    return Err(DecodeError::from(format!(
-                        "Invalid BRIDGE_QUERIER_IPV6_ADDRESS {e}"
-                    )));
+                    return Err(AxError::InvalidInput);
                 }
             },
             BRIDGE_QUERIER_IP_PORT => Ipv4Port(
                 parse_u32(payload)
-                    .context("invalid BRIDGE_QUERIER_IP_PORT value")?,
+                    ?,
             ),
             BRIDGE_QUERIER_IPV6_PORT => Ipv6Port(
                 parse_u32(payload)
-                    .context("invalid BRIDGE_QUERIER_IPV6_PORT value")?,
+                    ?,
             ),
             BRIDGE_QUERIER_IP_OTHER_TIMER => Ipv4OtherTimer(
                 parse_u64(payload)
-                    .context("invalid BRIDGE_QUERIER_IP_OTHER_TIMER value")?,
+                    ?,
             ),
             BRIDGE_QUERIER_IPV6_OTHER_TIMER => Ipv6OtherTimer(
                 parse_u64(payload)
-                    .context("invalid BRIDGE_QUERIER_IPV6_OTHER_TIMER value")?,
+                    ?,
             ),
 
             kind => Other(
-                DefaultNla::parse(buf)
-                    .context(format!("unknown NLA type {kind}"))?,
+                DefaultNla::parse(buf)?,
             ),
         })
     }

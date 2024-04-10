@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer},
     DecodeError, Emitable, Parseable,
@@ -45,13 +44,9 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for VfVlan {
         let payload = buf.value();
         Ok(match buf.kind() {
             IFLA_VF_VLAN_INFO => Self::Info(
-                VfVlanInfo::parse(&VfVlanInfoBuffer::new(payload)).context(
-                    format!("invalid IFLA_VF_VLAN_INFO {payload:?}"),
-                )?,
+                VfVlanInfo::parse(&VfVlanInfoBuffer::new(payload))?,
             ),
-            kind => Self::Other(DefaultNla::parse(buf).context(format!(
-                "failed to parse {kind} as DefaultNla: {payload:?}"
-            ))?),
+            kind => Self::Other(DefaultNla::parse(buf)?),
         })
     }
 }

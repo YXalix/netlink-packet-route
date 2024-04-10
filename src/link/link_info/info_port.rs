@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::{string::String, vec::Vec};
+use axerrno::AxError;
 use netlink_packet_utils::{
     nla::{Nla, NlaBuffer, NlasIterator},
     parsers::parse_string,
@@ -23,8 +24,8 @@ pub enum InfoPortKind {
     Other(String),
 }
 
-impl std::fmt::Display for InfoPortKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for InfoPortKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "{}",
@@ -65,14 +66,10 @@ impl Nla for InfoPortKind {
 impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for InfoPortKind {
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<InfoPortKind, DecodeError> {
         if buf.kind() != IFLA_INFO_PORT_KIND {
-            return Err(format!(
-                "failed to parse IFLA_INFO_PORT_KIND: NLA type is {}",
-                buf.kind()
-            )
-            .into());
+            return Err(AxError::InvalidInput);
         }
         let s = parse_string(buf.value())
-            .context("invalid IFLA_INFO_PORT_KIND value")?;
+            ?;
         Ok(match s.as_str() {
             BOND => Self::Bond,
             BRIDGE => Self::Bridge,
@@ -128,8 +125,6 @@ impl InfoPortData {
             InfoPortKind::Other(_) => Ok(InfoPortData::Other(payload.to_vec())),
         };
 
-        Ok(port_data.context(format!(
-            "failed to parse IFLA_INFO_PORT_DATA (IFLA_INFO_PORT_KIND is '{kind}')"
-        ))?)
+        Ok(port_data?)
     }
 }

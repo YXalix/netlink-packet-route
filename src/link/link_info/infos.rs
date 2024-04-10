@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
+use alloc::{string::{String, ToString}, vec::Vec};
+use axerrno::AxError;
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator},
     parsers::parse_string,
@@ -116,9 +117,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for VecLinkInfo {
                             LinkXstats::parse_with_param(&nla, link_info_kind)?,
                         ));
                     } else {
-                        return Err("IFLA_INFO_XSTATS is not \
-                            preceded by an IFLA_INFO_KIND"
-                            .into());
+                        return Err(AxError::InvalidInput);
                     }
                 }
                 IFLA_INFO_PORT_KIND => {
@@ -135,9 +134,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for VecLinkInfo {
                             )?,
                         ));
                     } else {
-                        return Err("IFLA_INFO_PORT_DATA is not preceded by \
-                            an IFLA_INFO_PORT_KIND"
-                            .into());
+                        return Err(AxError::InvalidInput);
                     }
                     link_info_port_kind = None;
                 }
@@ -153,16 +150,11 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for VecLinkInfo {
                             link_info_kind,
                         )?));
                     } else {
-                        return Err("IFLA_INFO_DATA is not preceded by an \
-                            IFLA_INFO_KIND"
-                            .into());
+                        return Err(AxError::InvalidInput);
                     }
                 }
                 _kind => nlas.push(LinkInfo::Other(
-                    DefaultNla::parse(&nla).context(format!(
-                        "Unknown NLA type for IFLA_INFO_DATA {:?}",
-                        nla
-                    ))?,
+                    DefaultNla::parse(&nla)?,
                 )),
             }
         }
@@ -203,8 +195,8 @@ pub enum InfoKind {
     Other(String),
 }
 
-impl std::fmt::Display for InfoKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for InfoKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "{}",
@@ -292,14 +284,10 @@ impl Nla for InfoKind {
 impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for InfoKind {
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<InfoKind, DecodeError> {
         if buf.kind() != IFLA_INFO_KIND {
-            return Err(format!(
-                "failed to parse IFLA_INFO_KIND: NLA type is {}",
-                buf.kind()
-            )
-            .into());
+            return Err(AxError::InvalidInput);
         }
         let s = parse_string(buf.value())
-            .context("invalid IFLA_INFO_KIND value")?;
+            ?;
         Ok(match s.as_str() {
             DUMMY => Self::Dummy,
             IFB => Self::Ifb,
